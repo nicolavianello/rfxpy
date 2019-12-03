@@ -469,7 +469,7 @@ class Uprobe:
         self.vFProfile.attrs["trange"] = trange
         return self.vFProfile.copy()
 
-    def VfProfilePlot(self):
+    def VfProfilePlot(self, axes=None, aggregate=False, **kwargs):
         """
         Plot the profile once it has been calculated taking care of the possible NaNs
 
@@ -478,32 +478,46 @@ class Uprobe:
             self.vFProfile
         except:
             _dummy = self.FloatingProfile()
+        if axes is None
+            fig, axes = mpl.pylab.subplots(figsize=(7, 6), nrows=1, ncols=1)
+            fig.subplots_adjust(bottom=0.17, left=0.17)
 
-        fig, ax = mpl.pylab.subplots(figsize=(7, 6), nrows=1, ncols=1)
-        fig.subplots_adjust(bottom=0.17, left=0.17)
-        for k in self.vFProfile.keys():
-            x = self.vFProfile[k].r
-            y = self.vFProfile[k].values
-            e = self.vFProfile[k].err / 2
-            l, = ax.plot(
-                x[~np.isnan(y)],
-                y[~np.isnan(y)],
-                "o--",
-                markersize=10,
-                label="Z = %3.2f" % self.vFProfile[k].Z,
-            )
-            ax.fill_between(
-                x[~np.isnan(y)],
-                y[~np.isnan(y)] - e,
-                y[~np.isnan(y)] + e,
-                color=l.get_mfc(),
-                edgecolor="white",
-                alpha=0.5,
-            )
+        if aggregate is False:
+            for k in self.vFProfile.keys():
+                x = self.vFProfile[k].r
+                y = self.vFProfile[k].values
+                e = self.vFProfile[k].err / 2
+                l, = axes.plot(
+                    x[~np.isnan(y)],
+                    y[~np.isnan(y)],
+                    "o--",
+                    markersize=10,
+                    label="Z = %3.2f" % self.vFProfile[k].Z,
+                )
+                axes.fill_between(
+                    x[~np.isnan(y)],
+                    y[~np.isnan(y)] - e,
+                    y[~np.isnan(y)] + e,
+                    color=l.get_mfc(),
+                    edgecolor="white",
+                    alpha=0.5,
+                )
 
-        ax.set_xlabel(r"R [m]")
-        ax.set_ylabel(r"V$_f$ [V]")
-        leg = ax.legend(loc="best", prop={"size": 20}, frameon=False, numpoints=1)
+            axes.set_xlabel(r"R [m]")
+            axes.set_ylabel(r"V$_f$ [V]")
+            leg = axes.legend(loc="best", prop={"size": 20}, frameon=False, numpoints=1)
+        else:
+            xAll = np.array([])
+            yAll = np.array([])
+            eAll = np.array([])
+            for k in self.vFProfile.keys():
+                xAll = np.append(xAll,self.vFProfile[k].r)
+                yAll = np.append(yAll,self.vFProfile[k].values)
+                eAll=  np.append(eAll,self.vFProfile[k].err / 2)
+            axes.errorbar(xAll[~np.isnan(yAll)], yAll[~np.isnan(yAll)],
+                          yerr=eAll[~np.isnan(yAll)], fmt='o', ms=12, **kwargs)
+            axes.set_xlabel(r"R [m]")
+            axes.set_ylabel(r"V$_f$ [V]")
 
     def TripleProfile(self, **kwargs):
         """
