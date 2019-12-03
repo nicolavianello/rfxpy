@@ -478,7 +478,7 @@ class Uprobe:
             self.vFProfile
         except:
             _dummy = self.FloatingProfile()
-        if axes is None
+        if axes is None:
             fig, axes = mpl.pylab.subplots(figsize=(7, 6), nrows=1, ncols=1)
             fig.subplots_adjust(bottom=0.17, left=0.17)
 
