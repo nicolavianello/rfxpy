@@ -1,8 +1,9 @@
 from __future__ import print_function
+
 # python CLASS for working on U-Probe
-__author__ = 'Nicola Vianello'
-__version__ = '0.2'
-__data__ = '27.09.2016'
+__author__ = "Nicola Vianello"
+__version__ = "0.2"
+__data__ = "27.09.2016"
 
 import numpy as np
 import MDSplus as mds
@@ -10,7 +11,8 @@ from scipy import constants
 import sys
 from ..utils import bw_filter as bw, deriv1d
 import matplotlib as mpl
-mpl.rc('font', **{'family': 'sans-serif', 'sans-serif': ['Helvetica']})
+
+mpl.rc("font", **{"family": "sans-serif", "sans-serif": ["Helvetica"]})
 mpl.rc("font", size=20)
 import xarray
 
@@ -58,7 +60,6 @@ class Uprobe:
 
     """
 
-
     def __init__(self, shot, **kwargs):
         """
         Init require only the shot
@@ -71,86 +72,107 @@ class Uprobe:
         """
 
         self.shot = shot
-        self.trange = kwargs.get('trange', np.asarray([None, None]))
+        self.trange = kwargs.get("trange", np.asarray([None, None]))
         self.tmin = self.trange[0]
         self.tmax = self.trange[1]
         # for this shot restore the gas
         try:
-            rfx = mds.Tree('rfx', self.shot)
-            gas = rfx.getNode(r'\rfx::v_config:vik1_gas').data()
+            rfx = mds.Tree("rfx", self.shot)
+            gas = rfx.getNode(r"\rfx::v_config:vik1_gas").data()
             rfx.quit()
-            if gas == 'D2':
-                self.Mi = 2*constants.proton_mass
-                self.alpha =  2.7 
+            if gas == "D2":
+                self.Mi = 2 * constants.proton_mass
+                self.alpha = 2.7
             else:
                 self.Mi = constants.proton_mass
                 self.alpha = 3
         except:
-            print('Gas Tree not available assuming Hydrogen')
+            print("Gas Tree not available assuming Hydrogen")
             self.Mi = constants.proton_mass
             self.alpha = 3
         if self.shot <= 35684:
-            self.area = 2*(np.pi*(1.675e-3) ** 2+2 * np.pi*1.675e-3*1e-3)
+            self.area = 2 * (np.pi * (1.675e-3) ** 2 + 2 * np.pi * 1.675e-3 * 1e-3)
         else:
-            self.area = (np.pi*(1.675e-3) ** 2+2 * np.pi*1.675e-3*1e-3)
-        
+            self.area = np.pi * (1.675e-3) ** 2 + 2 * np.pi * 1.675e-3 * 1e-3
+
         # restore the equilibrium rlcfs, zlcfs
-        at = mds.Tree('at', self.shot)
-        self.rlcfs = at.getNode(r'\s_rlcfs').data()
-        self.zlcfs = at.getNode(r'\s_zlcfs').data()
-        self.tEq = at.getNode(r'\s_rlcfs').getDimensionAt().data()
+        at = mds.Tree("at", self.shot)
+        self.rlcfs = at.getNode(r"\s_rlcfs").data()
+        self.zlcfs = at.getNode(r"\s_zlcfs").data()
+        self.tEq = at.getNode(r"\s_rlcfs").getDimensionAt().data()
         at.quit()
         # we use two methods in order to define attributes which
         # are useful throughout the class
-        self.dedg = mds.Tree('dedg', self.shot)
+        self.dedg = mds.Tree("dedg", self.shot)
         self._getEl()
         self._getMag()
         self._getProbeGrid()
 
-        
     def _getEl(self):
         """
         Get the name of the electrostatic signal
         for the given shot and write the appropriate
         attribute
         """
-        _string = r'getnci(getnci(\TOP.U_PROBE.SIGNALS.ELS,  "MEMBER_NIDS"), "NODE_NAME")'
+        _string = (
+            r'getnci(getnci(\TOP.U_PROBE.SIGNALS.ELS,  "MEMBER_NIDS"), "NODE_NAME")'
+        )
         self.sigEl = mds.Data.compile(_string).evaluate().data()
         self.sigEl = np.core.defchararray.strip(self.sigEl)
         # we then write the attribute for the available Is, Vp, and Vf
         self.sigElS = np.asarray([self.sigEl[i][:2] for i in range(self.sigEl.size)])
         # define as attribute the Floating potential, Is and Vp
-        self.vF = self.sigEl[self.sigElS == 'VF']
-        self.iS = self.sigEl[self.sigElS == 'IS']
-        self.vP = self.sigEl[self.sigElS == 'VP']
+        self.vF = self.sigEl[self.sigElS == "VF"]
+        self.iS = self.sigEl[self.sigElS == "IS"]
+        self.vP = self.sigEl[self.sigElS == "VP"]
         # this is an array of string corresponding to the towers
         self.ETower = np.asarray([self.sigEl[i][5] for i in range(self.sigEl.size)])
-        
+
     def _getMag(self):
         """
         Get the name of the magnetic signals and writhe
         the appropriate attribute
         """
-        _string = r'getnci(getnci(\TOP.U_PROBE.SIGNALS.MAG,  "MEMBER_NIDS"), "NODE_NAME")'
+        _string = (
+            r'getnci(getnci(\TOP.U_PROBE.SIGNALS.MAG,  "MEMBER_NIDS"), "NODE_NAME")'
+        )
         self.sigMag = mds.Data.compile(_string).evaluate().data()
         self.sigMag = np.core.defchararray.strip(self.sigMag)
         # we then write the attribute for the available Is, Vp, and Vf
         self.sigMagS = [self.sigMag[i][3:5] for i in range(np.size(self.sigMag))]
         # define as attribute the Radial, Toroidal, Poloidal components
-        if np.__version__ >= 1.12:
-            self.bR = self.sigMag[np.asarray(
-                [np.equal(self.sigMagS[i], 'BR') for i in
-                 range(np.size(self.sigMagS))], dtype=bool)]
-            self.bT = self.sigMag[np.asarray(
-                [np.equal(self.sigMagS[i], 'BT') for i in
-                 range(np.size(self.sigMagS))], dtype=bool)]
-            self.bP = self.sigMag[np.asarray(
-                [np.equal(self.sigMagS[i], 'BP') for i in
-                 range(np.size(self.sigMagS))], dtype=bool)]
-        else:
-            self.bR = self.sigMag[self.sigMagS == 'BR']
-            self.bT = self.sigMag[self.sigMagS == 'BT']
-            self.bP = self.sigMag[self.sigMagS == 'BP']
+        # if np.__version__ >= 1.12:
+        #     self.bR = self.sigMag[
+        #         np.asarray(
+        #             [
+        #                 np.equal(self.sigMagS[i], "BR")
+        #                 for i in range(np.size(self.sigMagS))
+        #             ],
+        #             dtype=bool,
+        #         )
+        #     ]
+        #     self.bT = self.sigMag[
+        #         np.asarray(
+        #             [
+        #                 np.equal(self.sigMagS[i], "BT")
+        #                 for i in range(np.size(self.sigMagS))
+        #             ],
+        #             dtype=bool,
+        #         )
+        #     ]
+        #     self.bP = self.sigMag[
+        #         np.asarray(
+        #             [
+        #                 np.equal(self.sigMagS[i], "BP")
+        #                 for i in range(np.size(self.sigMagS))
+        #             ],
+        #             dtype=bool,
+        #         )
+        #     ]
+        # else:
+        self.bR = self.sigMag[self.sigMagS == "BR"]
+        self.bT = self.sigMag[self.sigMagS == "BT"]
+        self.bP = self.sigMag[self.sigMagS == "BP"]
         # this is an array of A and B corresponding to the Towers
         self.MTower = np.asarray([self.sigMag[i][5] for i in range(self.sigMag.size)])
 
@@ -163,10 +185,12 @@ class Uprobe:
         """
         # get the absolute position and translate into relative position.
         # This is the position of the edge of the probehead
-        dummy = self.dedg.getNode(r'\insertion').data()
-        self.rProbe = 2. + (0.459-(dummy/1e3-1.460)) # this is the position in [m] with respect
-        self.phiProbe = self.dedg.getNode(r'\u_probe_tor_angle').data()
-        self.rotProbe = self.dedg.getNode(r'\rotation').data()
+        dummy = self.dedg.getNode(r"\insertion").data()
+        self.rProbe = 2.0 + (
+            0.459 - (dummy / 1e3 - 1.460)
+        )  # this is the position in [m] with respect
+        self.phiProbe = self.dedg.getNode(r"\u_probe_tor_angle").data()
+        self.rotProbe = self.dedg.getNode(r"\rotation").data()
         # now we build the appropriate positions (R, Z, PHI)
         # R grid for all the signals
         self.ElR = np.zeros(self.sigEl.size)
@@ -174,41 +198,61 @@ class Uprobe:
         self.ElZ = np.zeros(self.sigEl.size)
         # Poloidal positions
         self.ElP = np.zeros(self.sigEl.size)
-        self.EGrid={}
+        self.EGrid = {}
         for probe, i in zip(self.sigEl, range(self.sigEl.size)):
-            self.ElR[i] = self.rProbe + self.dedg.getNode('\\'+probe[3:8]+':dr').data()
+            self.ElR[i] = (
+                self.rProbe + self.dedg.getNode("\\" + probe[3:8] + ":dr").data()
+            )
             if self.rotProbe == 0:
                 dummy = np.arctan2(
-                    np.abs(self.dedg.getNode('\\'+probe[3:8]+':dx').data()), (2+self.ElDr[i]))
-                self.ElP[i] = self.phiProbe + \
-                                + np.sign(
-                                    self.dedg.getNode('\\'+probe[3:8]+':dx').data())*np.degree(
-                                        dummy)
+                    np.abs(self.dedg.getNode("\\" + probe[3:8] + ":dx").data()),
+                    (2 + self.ElDr[i]),
+                )
+                self.ElP[i] = self.phiProbe + +np.sign(
+                    self.dedg.getNode("\\" + probe[3:8] + ":dx").data()
+                ) * np.degree(dummy)
             else:
-                self.ElZ[i] = self.dedg.getNode('\\'+probe[3:8]+':dx').data()
+                self.ElZ[i] = self.dedg.getNode("\\" + probe[3:8] + ":dx").data()
 
             rLcfs = self._getLcfs(self.ElR[i], self.ElZ[i])
-            self.EGrid[probe] = dict([('R', self.ElR[i]), ('Z', self.ElZ[i]),
-                                      ('Phi', self.ElP[i]), ('Rrlcfs', rLcfs)])
+            self.EGrid[probe] = dict(
+                [
+                    ("R", self.ElR[i]),
+                    ("Z", self.ElZ[i]),
+                    ("Phi", self.ElP[i]),
+                    ("Rrlcfs", rLcfs),
+                ]
+            )
         # now the same for the magnetic
         self.MgR = np.zeros(self.sigMag.size)
         self.MgZ = np.zeros(self.sigMag.size)
         self.MgP = np.zeros(self.sigMag.size)
         self.MGrid = {}
         for probe, i in zip(self.sigMag, range(self.sigMag.size)):
-            self.MgR[i] = self.rProbe + self.dedg.getNode('\\'+probe[3:8]+':dr').data()
+            self.MgR[i] = (
+                self.rProbe + self.dedg.getNode("\\" + probe[3:8] + ":dr").data()
+            )
             if self.rotProbe == 0:
                 dummy = np.arctan2(
-                    np.abs(self.dedg.getNode('\\'+probe[3:8]+':dx').data()), (2+self.ElDr[i]))
-                self.MgP[i] = self.phiProbe + \
-                                + np.sign(
-                                    self.dedg.getNode('\\'+probe[3:8]+':dx').data())*np.degree(
-                                        dummy)
+                    np.abs(self.dedg.getNode("\\" + probe[3:8] + ":dx").data()),
+                    (2 + self.ElDr[i]),
+                )
+                self.MgP[i] = self.phiProbe + +np.sign(
+                    self.dedg.getNode("\\" + probe[3:8] + ":dx").data()
+                ) * np.degree(dummy)
             else:
-                self.MgZ[i] = 0.459 + self.dedg.getNode('\\'+probe[3:8]+':dx').data()
+                self.MgZ[i] = (
+                    0.459 + self.dedg.getNode("\\" + probe[3:8] + ":dx").data()
+                )
             rLcfs = self._getLcfs(self.MgR[i], self.MgZ[i])
-            self.MGrid[probe] = dict([('R', self.MgR[i]), ('Z', self.MgZ[i]),
-                                      ('Phi', self.MgP[i]), ('Rrlcfs', rLcfs)])
+            self.MGrid[probe] = dict(
+                [
+                    ("R", self.MgR[i]),
+                    ("Z", self.MgZ[i]),
+                    ("Phi", self.MgP[i]),
+                    ("Rrlcfs", rLcfs),
+                ]
+            )
 
     def _getLcfs(self, R, Z):
         """
@@ -233,19 +277,19 @@ class Uprobe:
         rDistlcfs = np.zeros(self.tEq.size)
         for i in range(self.tEq.size):
             # create Vertices of the Lcfs path
-            Vert = np.asarray([self.rlcfs[:,i],self.zlcfs[:,i]]).transpose()
+            Vert = np.asarray([self.rlcfs[:, i], self.zlcfs[:, i]]).transpose()
             prev = 0
             Lambda = np.array([])
-            for k in range(len(Vert)-1):
-                svec = Vert[k+1]-Vert[k]
-                snorm = svec/np.linalg.norm(svec)
+            for k in range(len(Vert) - 1):
+                svec = Vert[k + 1] - Vert[k]
+                snorm = svec / np.linalg.norm(svec)
                 nvec = np.asarray([-snorm[1], snorm[0]])
-                dist = np.asarray((R, Z)-Vert[k])
-                sigma = np.dot(dist, svec)/np.dot(svec, svec)
-                if (sigma >= 0) and (sigma <= 1) or (sigma*prev < 0 ):
+                dist = np.asarray((R, Z) - Vert[k])
+                sigma = np.dot(dist, svec) / np.dot(svec, svec)
+                if (sigma >= 0) and (sigma <= 1) or (sigma * prev < 0):
                     Lambda = np.append(Lambda, np.dot(-dist, nvec))
                 prev = sigma
-            rDistlcfs[i] = Lambda[np.argmin(np.abs(Lambda))]    
+            rDistlcfs[i] = Lambda[np.argmin(np.abs(Lambda))]
 
         return rDistlcfs
 
@@ -291,7 +335,7 @@ class Uprobe:
         # plasma potential, R, Z, Phi coordinates
         self.triple = {}
         for s in _dummy5Pins:
-            t = self.dedg.getNode(r'\is_es'+s+'3').getDimensionAt().data()
+            t = self.dedg.getNode(r"\is_es" + s + "3").getDimensionAt().data()
             if self.trange[0] is None:
                 tmin = t.min()
             else:
@@ -300,34 +344,50 @@ class Uprobe:
                 tmax = t.max()
             else:
                 tmax = self.trange[1]
-            _indT = ((t>= tmin) & (t<= tmax))
-            self.dt = (t.max()-t.min())/(t.size-1)
-            self.Fs = np.round(1./self.dt)
-            vF1 = self.dedg.getNode(r'\vf_es'+s+'1').data()[_indT]-\
-                  self.dedg.getNode(r'\vf_es'+s+'1').data()[(t<0)].mean()
-            vF5 = self.dedg.getNode(r'\vf_es'+s+'5').data()[_indT]-\
-                  self.dedg.getNode(r'\vf_es'+s+'5').data()[(t<0)].mean()
-            vF = 0.5*(vF1+vF5)
-            iS = self.dedg.getNode(r'\is_es'+s+'3').data()[_indT] -\
-                 self.dedg.getNode(r'\is_es'+s+'3').data()[(t<0)].mean()
-            vP = self.dedg.getNode(r'\vp_es'+s+'2').data()[_indT] -\
-                 self.dedg.getNode(r'\vp_es'+s+'2').data()[(t<0)].mean()
-            te = bw.bw_filter((vP-vF) / np.log(3),
-                              self.fhigh, self.Fs, 'lowpass') # electron temperature filtered
+            _indT = (t >= tmin) & (t <= tmax)
+            self.dt = (t.max() - t.min()) / (t.size - 1)
+            self.Fs = np.round(1.0 / self.dt)
+            vF1 = (
+                self.dedg.getNode(r"\vf_es" + s + "1").data()[_indT]
+                - self.dedg.getNode(r"\vf_es" + s + "1").data()[(t < 0)].mean()
+            )
+            vF5 = (
+                self.dedg.getNode(r"\vf_es" + s + "5").data()[_indT]
+                - self.dedg.getNode(r"\vf_es" + s + "5").data()[(t < 0)].mean()
+            )
+            vF = 0.5 * (vF1 + vF5)
+            iS = (
+                self.dedg.getNode(r"\is_es" + s + "3").data()[_indT]
+                - self.dedg.getNode(r"\is_es" + s + "3").data()[(t < 0)].mean()
+            )
+            vP = (
+                self.dedg.getNode(r"\vp_es" + s + "2").data()[_indT]
+                - self.dedg.getNode(r"\vp_es" + s + "2").data()[(t < 0)].mean()
+            )
+            te = bw.bw_filter(
+                (vP - vF) / np.log(3), self.fhigh, self.Fs, "lowpass"
+            )  # electron temperature filtered
             te[(te <= 5)] = 5
-            cs = np.sqrt(2 * constants.e * te / (self.Mi)) # ion sound speed
+            cs = np.sqrt(2 * constants.e * te / (self.Mi))  # ion sound speed
             en = 2 * (iS) / (self.area * cs * constants.e * 1e19)
-            vPl = vP+self.alpha*te
+            vPl = vP + self.alpha * te
             # compute also the plasma pressure
-            pe = constants.elementary_charge*te*en*1e19
+            pe = constants.elementary_charge * te * en * 1e19
             t = t[_indT]
-            self.triple[s] = dict([('ne', en), ('te', te), ('vp', vPl), ('pe', pe),
-                                   ('t', t), 
-                                   ('r', self.ElR[np.where(self.sigEl == r'IS_ES'+s+'3')][0]),
-                                   ('z', self.ElZ[np.where(self.sigEl == r'IS_ES'+s+'3')][0]),
-                                   ('phi', self.ElP[np.where(self.sigEl == r'IS_ES'+s+'3')][0]),
-                                   ('Rrlcfs', self.EGrid['IS_ES'+s+'3']['Rrlcfs']),
-                                   ('Js', iS/(self.area))])
+            self.triple[s] = dict(
+                [
+                    ("ne", en),
+                    ("te", te),
+                    ("vp", vPl),
+                    ("pe", pe),
+                    ("t", t),
+                    ("r", self.ElR[np.where(self.sigEl == r"IS_ES" + s + "3")][0]),
+                    ("z", self.ElZ[np.where(self.sigEl == r"IS_ES" + s + "3")][0]),
+                    ("phi", self.ElP[np.where(self.sigEl == r"IS_ES" + s + "3")][0]),
+                    ("Rrlcfs", self.EGrid["IS_ES" + s + "3"]["Rrlcfs"]),
+                    ("Js", iS / (self.area)),
+                ]
+            )
         self.t = t
         self.nsample = self.t.size
 
@@ -341,7 +401,7 @@ class Uprobe:
         """
         dummy = []
         for probe in self.vF:
-            t = self.dedg.getNode('\\'+probe).getDimensionAt().data()
+            t = self.dedg.getNode("\\" + probe).getDimensionAt().data()
             if self.trange[0] is None:
                 tmin = t.min()
             else:
@@ -350,18 +410,20 @@ class Uprobe:
                 tmax = t.max()
             else:
                 tmax = self.trange[1]
-            _indT = ((t>= tmin) & (t<= tmax))
-            sig = self.dedg.getNode('\\'+probe).data()[_indT] -\
-                  self.dedg.getNode('\\'+probe).data()[(t<0)].mean()
+            _indT = (t >= tmin) & (t <= tmax)
+            sig = (
+                self.dedg.getNode("\\" + probe).data()[_indT]
+                - self.dedg.getNode("\\" + probe).data()[(t < 0)].mean()
+            )
             t = t[_indT]
-            _dummyX = xarray.DataArray(sig, coords=[t],dims=['time'])
+            _dummyX = xarray.DataArray(sig, coords=[t], dims=["time"])
             dummy.append(_dummyX)
 
-        self.vFArr = xarray.concat(dummy, dim='Probe')
-        self.vFArr['Probe']=self.vF
-        self.vFArr.attrs['R'] = np.asarray([self.EGrid[k]['R'] for k in self.vF])
-        self.vFArr.attrs['Z'] = np.asarray([self.EGrid[k]['Z'] for k in self.vF])
-        self.vFArr.attrs['Phi'] = np.asarray([self.EGrid[k]['Phi'] for k in self.vF])
+        self.vFArr = xarray.concat(dummy, dim="Probe")
+        self.vFArr["Probe"] = self.vF
+        self.vFArr.attrs["R"] = np.asarray([self.EGrid[k]["R"] for k in self.vF])
+        self.vFArr.attrs["Z"] = np.asarray([self.EGrid[k]["Z"] for k in self.vF])
+        self.vFArr.attrs["Phi"] = np.asarray([self.EGrid[k]["Phi"] for k in self.vF])
 
     def FloatingProfile(self, **kwargs):
         """
@@ -372,31 +434,39 @@ class Uprobe:
             self.vFArr
         except:
             self.getFloating()
-        trange = kwargs.get('trange',
-                            [self.vFArr.time.min().item(),
-                             self.vFArr.time.max().item()])
-        _dummy = self.vFArr.where(((self.vFArr.time >= trange[0]) &
-                                   (self.vFArr.time <= trange[1])), drop=True)
+        trange = kwargs.get(
+            "trange", [self.vFArr.time.min().item(), self.vFArr.time.max().item()]
+        )
+        _dummy = self.vFArr.where(
+            ((self.vFArr.time >= trange[0]) & (self.vFArr.time <= trange[1])), drop=True
+        )
         # find the corresponding point in time where the equilibrium is within
         # the limit
-        _idxEq = ((self.tEq >= trange[0]) & (self.tEq <= trange[1]))
+        _idxEq = (self.tEq >= trange[0]) & (self.tEq <= trange[1])
         # we must select the floating potential according to Z and
         # average over time. We loop and create an appropriate
         # xarray to be used afterwards as groupby
         _dummyP = []
         err = []
-        for z, i in zip(np.unique(self.vFArr.Z),
-                        range(np.unique(self.vFArr.Z).size)):
-            a = _dummy[(self.vFArr.Z == z), :].mean(dim='time')
-            e = _dummy[(self.vFArr.Z == z), :].std(dim='time')
-            r = np.asarray([self.EGrid[p]['Rrlcfs'][_idxEq].mean() for p in
-                            self.vFArr[(self.vFArr.Z == z), :].Probe.values])
-            
-            _dummyP.append(xarray.DataArray(a.values, coords=[r], dims=['r'],
-                                            attrs={'err':e.values, 'Z':z}))
+        for z, i in zip(np.unique(self.vFArr.Z), range(np.unique(self.vFArr.Z).size)):
+            a = _dummy[(self.vFArr.Z == z), :].mean(dim="time")
+            e = _dummy[(self.vFArr.Z == z), :].std(dim="time")
+            r = np.asarray(
+                [
+                    self.EGrid[p]["Rrlcfs"][_idxEq].mean()
+                    for p in self.vFArr[(self.vFArr.Z == z), :].Probe.values
+                ]
+            )
+
+            _dummyP.append(
+                xarray.DataArray(
+                    a.values, coords=[r], dims=["r"], attrs={"err": e.values, "Z": z}
+                )
+            )
         self.vFProfile = xarray.merge(
-            [xarray.DataArray(_dummyP[k], name='Z%d' %k) for k in range(len(_dummyP))])
-        self.vFProfile.attrs['trange'] = trange
+            [xarray.DataArray(_dummyP[k], name="Z%d" % k) for k in range(len(_dummyP))]
+        )
+        self.vFProfile.attrs["trange"] = trange
         return self.vFProfile.copy()
 
     def VfProfilePlot(self):
@@ -414,16 +484,26 @@ class Uprobe:
         for k in self.vFProfile.keys()[1:]:
             x = self.vFProfile[k].r
             y = self.vFProfile[k].values
-            e = self.vFProfile[k].err/2
-            l, = ax.plot(x[~np.isnan(y)], y[~np.isnan(y)], 'o--', markersize=10,
-                         label='Z = %3.2f' % self.vFProfile[k].Z)
-            ax.fill_between(x[~np.isnan(y)], y[~np.isnan(y)]-e,
-                            y[~np.isnan(y)]+e, color=l.get_mfc(), edgecolor='white', alpha=0.5)
+            e = self.vFProfile[k].err / 2
+            l, = ax.plot(
+                x[~np.isnan(y)],
+                y[~np.isnan(y)],
+                "o--",
+                markersize=10,
+                label="Z = %3.2f" % self.vFProfile[k].Z,
+            )
+            ax.fill_between(
+                x[~np.isnan(y)],
+                y[~np.isnan(y)] - e,
+                y[~np.isnan(y)] + e,
+                color=l.get_mfc(),
+                edgecolor="white",
+                alpha=0.5,
+            )
 
-        ax.set_xlabel(r'R [m]')
-        ax.set_ylabel(r'V$_f$ [V]')
-        leg=ax.legend(loc='best', prop={'size': 20},
-                      frameon=False, numpoints=1)
+        ax.set_xlabel(r"R [m]")
+        ax.set_ylabel(r"V$_f$ [V]")
+        leg = ax.legend(loc="best", prop={"size": 20}, frameon=False, numpoints=1)
 
     def TripleProfile(self, **kwargs):
         """
@@ -437,16 +517,16 @@ class Uprobe:
         keys : In case we would like to have profile limiting to some of the available
                triples
         """
-        self.fhigh = kwargs.get('fhigh', 10e3)
+        self.fhigh = kwargs.get("fhigh", 10e3)
         try:
             self.triple
         except:
             self.getDensity(fhigh=self.fhigh)
 
-        keys = kwargs.get('keys', self.triple.keys())
+        keys = kwargs.get("keys", self.triple.keys())
 
         # now determine the ranges
-        trange = kwargs.get('trange', [self.t.min(), self.t.max()])
+        trange = kwargs.get("trange", [self.t.min(), self.t.max()])
         EnP = np.zeros(len(keys))
         EnE = np.zeros(len(keys))
         TeP = np.zeros(len(keys))
@@ -458,20 +538,20 @@ class Uprobe:
         JsP = np.zeros(len(keys))
         JsE = np.zeros(len(keys))
         rP = np.zeros(len(keys))
-        _idx = ((self.t >= trange[0]) & (self.t <= trange[1]))
-        _idxE = ((self.tEq >= trange[0]) & (self.tEq <= trange[1]))
+        _idx = (self.t >= trange[0]) & (self.t <= trange[1])
+        _idxE = (self.tEq >= trange[0]) & (self.tEq <= trange[1])
         for k, i in zip(keys, range(len(keys))):
-            EnP[i] = self.triple[k]['ne'][_idx].mean()
-            EnE[i] = self.triple[k]['ne'][_idx].std()
-            TeP[i] = self.triple[k]['te'][_idx].mean()
-            TeE[i] = self.triple[k]['te'][_idx].std()
-            PeP[i] = self.triple[k]['pe'][_idx].mean()
-            PeE[i] = self.triple[k]['pe'][_idx].std()
-            VpP[i] = self.triple[k]['vp'][_idx].mean()
-            VpE[i] = self.triple[k]['vp'][_idx].std()
-            JsP[i] = self.triple[k]['Js'][_idx].mean()
-            JsE[i] = self.triple[k]['Js'][_idx].std()
-            rP[i] = self.triple[k]['Rrlcfs'][_idxE].mean()
+            EnP[i] = self.triple[k]["ne"][_idx].mean()
+            EnE[i] = self.triple[k]["ne"][_idx].std()
+            TeP[i] = self.triple[k]["te"][_idx].mean()
+            TeE[i] = self.triple[k]["te"][_idx].std()
+            PeP[i] = self.triple[k]["pe"][_idx].mean()
+            PeE[i] = self.triple[k]["pe"][_idx].std()
+            VpP[i] = self.triple[k]["vp"][_idx].mean()
+            VpE[i] = self.triple[k]["vp"][_idx].std()
+            JsP[i] = self.triple[k]["Js"][_idx].mean()
+            JsE[i] = self.triple[k]["Js"][_idx].std()
+            rP[i] = self.triple[k]["Rrlcfs"][_idxE].mean()
 
         # reorder accoring to rP
         EnP = EnP[np.argsort(rP)]
@@ -485,12 +565,22 @@ class Uprobe:
         JsP = JsP[np.argsort(rP)]
         JsE = JsP[np.argsort(rP)]
         rP = rP[np.argsort(rP)]
-        
-        out = {'r':rP, 'Dens':EnP, 'DensErr':EnE,
-               'Temp':TeP, 'TempErr':TeE, 'Pe':PeP, 'PeE':PeE,
-               'Vp':VpP, 'VpE':VpE, 'Js':JsP, 'JsE':JsE}
+
+        out = {
+            "r": rP,
+            "Dens": EnP,
+            "DensErr": EnE,
+            "Temp": TeP,
+            "TempErr": TeE,
+            "Pe": PeP,
+            "PeE": PeE,
+            "Vp": VpP,
+            "VpE": VpE,
+            "Js": JsP,
+            "JsE": JsE,
+        }
         return out
-    
+
     def _getExB(self, floating=False):
         """
         Get the ExB velocity using plasma potential on probe on
@@ -511,16 +601,25 @@ class Uprobe:
                     # check the number of signals in each of the tower
                     ns = np.count_nonzero(_dummy == tow)
                     r = np.zeros(ns)
-                    sig = np.vstack([self.triple[self.triple.keys()[key]]['vp']
-                                     for key in _Idx[_dummy==tow]])
-                    r = np.asarray([self.triple[self.triple.keys()[key]]['r']
-                                    for key in _Idx[_dummy==tow]])
+                    sig = np.vstack(
+                        [
+                            self.triple[self.triple.keys()[key]]["vp"]
+                            for key in _Idx[_dummy == tow]
+                        ]
+                    )
+                    r = np.asarray(
+                        [
+                            self.triple[self.triple.keys()[key]]["r"]
+                            for key in _Idx[_dummy == tow]
+                        ]
+                    )
                     # now provide the gradient for each of the time point
                     sig = sig[np.argsort(r), :]
                     r = r[np.argsort(r)]
-                    _d = -np.asarray([deriv1d.deriv(r, sig[:, i])
-                                      for i in range(self.nsample)])
-                    self.ExB[tow] = dict([('vel', _d), ('r', r), ('t', self.t)])
+                    _d = -np.asarray(
+                        [deriv1d.deriv(r, sig[:, i]) for i in range(self.nsample)]
+                    )
+                    self.ExB[tow] = dict([("vel", _d), ("r", r), ("t", self.t)])
         else:
             # we must read the floating potential signals
             try:
@@ -528,8 +627,9 @@ class Uprobe:
             except:
                 self._getFloating()
             # now define the arrays for each of the tower
-            # we use a try/catch so that we do not need to 
+            # we use a try/catch so that we do not need to
             # double check on the existence
             Couples = np.unique(np.asarray([k[5:7] for k in self.vF]))
+
+
 #            for c in Couples:
-                
