@@ -506,7 +506,7 @@ class Uprobe:
             xAll = np.array([])
             yAll = np.array([])
             eAll = np.array([])
-            for k in self.vFProfile.keys():
+            for k in range(len(self.vFProfile)):
                 xAll = np.append(xAll,self.vFProfile[k].r)
                 yAll = np.append(yAll,self.vFProfile[k].values)
                 eAll=  np.append(eAll,self.vFProfile[k].err / 2)
