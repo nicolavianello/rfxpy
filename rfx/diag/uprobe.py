@@ -481,7 +481,7 @@ class Uprobe:
 
         fig, ax = mpl.pylab.subplots(figsize=(7, 6), nrows=1, ncols=1)
         fig.subplots_adjust(bottom=0.17, left=0.17)
-        for k in self.vFProfile.keys()[1:]:
+        for k in self.vFProfile.keys():
             x = self.vFProfile[k].r
             y = self.vFProfile[k].values
             e = self.vFProfile[k].err / 2
