@@ -427,7 +427,7 @@ class Uprobe:
 
     def FloatingProfile(self, **kwargs):
         """
-        Provide a dictionary with the appropriate profiles computed from
+        Provide a list f DataArray each containing the profiles on different rows
         """
         # check the the floating potential has been properly stored
         try:
@@ -447,8 +447,7 @@ class Uprobe:
         # average over time. We loop and create an appropriate
         # xarray to be used afterwards as groupby
         _dummyP = []
-        err = []
-        for z, i in zip(np.unique(self.vFArr.Z), range(np.unique(self.vFArr.Z).size)):
+        for i, z in enumerate(np.unique(self.vFArr.Z)):
             a = _dummy[(self.vFArr.Z == z), :].mean(dim="time")
             e = _dummy[(self.vFArr.Z == z), :].std(dim="time")
             r = np.asarray(
@@ -460,13 +459,10 @@ class Uprobe:
 
             _dummyP.append(
                 xarray.DataArray(
-                    a.values, coords=[r], dims=["r"], attrs={"err": e.values, "Z": z}
+                    a.values, coords=[r], dims=["r"], attrs={"err": e.values, "Z": z, "trange":trange}
                 )
             )
-        self.vFProfile = xarray.merge(
-            [xarray.DataArray(_dummyP[k], name="Z%d" % k) for k in range(len(_dummyP))]
-        )
-        self.vFProfile.attrs["trange"] = trange
+        self.vFProfile = _dummyP
         return self.vFProfile.copy()
 
     def VfProfilePlot(self, axes=None, aggregate=False, **kwargs):
@@ -483,7 +479,7 @@ class Uprobe:
             fig.subplots_adjust(bottom=0.17, left=0.17)
 
         if aggregate is False:
-            for k in self.vFProfile.keys():
+            for k in range(len(self.vFProfile)):
                 x = self.vFProfile[k].r
                 y = self.vFProfile[k].values
                 e = self.vFProfile[k].err / 2
