@@ -312,18 +312,18 @@ class Uprobe:
         triple : :obj: `dict`
             Dictionary of dictionary containing with keys corresponding to
             the short name of the found triple probe. Each subdictionary
-            contains the following 
+            contains the following
                  {
                     't' : time basis,
-                    'en' : electron density, 
+                    'en' : electron density,
                     'te' : electron temperature,
                     'pe' : electron pressure,
-                    'vp' : plasma potential, 
-                    'Js' : Ion saturation current density, 
+                    'vp' : plasma potential,
+                    'Js' : Ion saturation current density,
                     'R' : Absolute radial position of the central pin,
                     'Z' : Absolute vertical position of the central pin,
-                    'Phi' : Absolute toroidal angle of the central pin, 
-                    'Rrlcfs' : Relative position with respect to LCFS, 
+                    'Phi' : Absolute toroidal angle of the central pin,
+                    'Rrlcfs' : Relative position with respect to LCFS,
                  }
         """
         self.fhigh = fhigh
@@ -459,7 +459,10 @@ class Uprobe:
 
             _dummyP.append(
                 xarray.DataArray(
-                    a.values, coords=[r], dims=["r"], attrs={"err": e.values, "Z": z, "trange":trange}
+                    a.values,
+                    coords=[r],
+                    dims=["r"],
+                    attrs={"err": e.values, "Z": z, "trange": trange},
                 )
             )
         self.vFProfile = _dummyP
@@ -483,7 +486,7 @@ class Uprobe:
                 x = self.vFProfile[k].r
                 y = self.vFProfile[k].values
                 e = self.vFProfile[k].err / 2
-                l, = axes.plot(
+                (l,) = axes.plot(
                     x[~np.isnan(y)],
                     y[~np.isnan(y)],
                     "o--",
@@ -507,11 +510,17 @@ class Uprobe:
             yAll = np.array([])
             eAll = np.array([])
             for k in range(len(self.vFProfile)):
-                xAll = np.append(xAll,self.vFProfile[k].r)
-                yAll = np.append(yAll,self.vFProfile[k].values)
-                eAll=  np.append(eAll,self.vFProfile[k].err / 2)
-            axes.errorbar(xAll[~np.isnan(yAll)], yAll[~np.isnan(yAll)],
-                          yerr=eAll[~np.isnan(yAll)], fmt='o', ms=12, **kwargs)
+                xAll = np.append(xAll, self.vFProfile[k].r)
+                yAll = np.append(yAll, self.vFProfile[k].values)
+                eAll = np.append(eAll, self.vFProfile[k].err / 2)
+            axes.errorbar(
+                xAll[~np.isnan(yAll)],
+                yAll[~np.isnan(yAll)],
+                yerr=eAll[~np.isnan(yAll)],
+                fmt="o",
+                ms=12,
+                **kwargs
+            )
             axes.set_xlabel(r"R [m]")
             axes.set_ylabel(r"V$_f$ [V]")
 
