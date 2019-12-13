@@ -1,5 +1,5 @@
 import numpy as np
-from scipy import UnivariateSpline
+from scipy.interpolate import UnivariateSpline
 
 
 def correlation(x, y):
@@ -19,5 +19,5 @@ def correlation(x, y):
     c = np.correlate(x, y, mode="same")
     c /= np.sqrt(np.dot(x, x) * np.dot(y, y))
     S = UnivariateSpline(lag, c - 1 / np.exp(1), s=0)
-    tac = S.roots()[S.roots() > 0]
+    tac = S.roots()[S.roots() > 0][0]
     return lag, c, tac
