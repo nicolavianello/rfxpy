@@ -667,7 +667,7 @@ class Uprobe:
         self.getFloating(trange=trange)
         R, Z = np.sort(np.unique(self.vFArr.R)), np.sort(np.unique(self.vFArr.Z))
         M = np.zeros((self.vFArr.time.size, R.size, Z.size))
-        for p in self.vFArr.Probes.values:
+        for p in self.vFArr.Probe.values:
             _rr, _zz = self.EGrid[p]["R"], self.EGrid[p]["Z"]
             i, j = np.where(R == _rr)[0][0], np.where(Z == _zz)[0][0]
             M[:, i, j] = self.vFArr.sel(Probe=p).values
