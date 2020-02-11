@@ -651,3 +651,30 @@ class Uprobe:
 
         """
         pass
+
+    def getVfMap(self, **kwargs):
+        """
+        small method to get the VfMap on a rectangular grip with linear interpolation
+        for the missing points. Useful for further spline or map
+        Args:
+            **kwargs: eventually a time range can be directly passed
+
+        Returns:
+            Map in (#time,#R,#Z) with corresponding time, r, z
+        """
+
+        trange = kwargs.get("trange", self.trange)
+        self.getFloating(trange=trange)
+        R, Z = np.sort(np.unique(self.vFArr.R)), np.sort(np.unique(self.vFArr.Z))
+        M = np.zeros((self.vFArr.time.size, R.size, Z.size))
+        for p in self.vFArr.Probes.values:
+            _rr, _zz = self.EGrid[p]["R"], self.EGrid[p]["Z"]
+            i, j = np.where(R == _rr)[0][0], np.where(Z == _zz)[0][0]
+            M[:, i, j] = self.vFArr.sel(Probe=p).values
+        # now sanity check for identically 0 values to be substitute with the mean
+        for i in range(R.size):
+            for j in range(Z.size):
+                if np.mean(M[:, i, j]) == 0:
+                    M[:, i, j] = (M[:, i, j - 1] + M[:, i, j + 1]) / 2.0
+
+        return M, self.vFArr.time.values, R, Z
