@@ -100,7 +100,10 @@ class Uprobe:
         self.rlcfs = at.getNode(r"\s_rlcfs").data()
         self.zlcfs = at.getNode(r"\s_zlcfs").data()
         self.tEq = at.getNode(r"\s_rlcfs").getDimensionAt().data()
-        at.quit()
+        # if mds.__version__:
+        #     at.quit
+        # else:
+        #     at.quit()
         # we use two methods in order to define attributes which
         # are useful throughout the class
         self.dedg = mds.Tree("dedg", self.shot)
@@ -293,7 +296,7 @@ class Uprobe:
 
         return rDistlcfs
 
-    def getDensity(self, fhigh=10e3):
+    def getDensity(self, fhigh=10e3, **kwargs):
         """
 
         This method read the appropriate signal to
@@ -333,17 +336,11 @@ class Uprobe:
         # now we build for each of the row the appropriate density and temperature
         # we build a dictionary where for each row we save the density, temperature
         # plasma potential, R, Z, Phi coordinates
+        trange = kwargs.get("trange", self.trange)
         self.triple = {}
         for s in _dummy5Pins:
             t = self.dedg.getNode(r"\is_es" + s + "3").getDimensionAt().data()
-            if self.trange[0] is None:
-                tmin = t.min()
-            else:
-                tmin = self.trange[0]
-            if self.trange[1] is None:
-                tmax = t.max()
-            else:
-                tmax = self.trange[1]
+            tmin, tmax = trange[0], trange[1]
             _indT = (t >= tmin) & (t <= tmax)
             self.dt = (t.max() - t.min()) / (t.size - 1)
             self.Fs = np.round(1.0 / self.dt)
@@ -386,12 +383,11 @@ class Uprobe:
                     ("phi", self.ElP[np.where(self.sigEl == r"IS_ES" + s + "3")][0]),
                     ("Rrlcfs", self.EGrid["IS_ES" + s + "3"]["Rrlcfs"]),
                     ("Js", iS / (self.area)),
+                    ("t", t),
                 ]
             )
-        self.t = t
-        self.nsample = self.t.size
 
-    def getFloating(self):
+    def getFloating(self, **kwargs):
         """
 
         Get the floating potential and save them in a dictionary
@@ -399,17 +395,11 @@ class Uprobe:
         floating is an Attribute of the class
 
         """
+        trange = kwargs.get("trange", self.trange)
+        tmin, tmax = trange[0], trange[1]
         dummy = []
         for probe in self.vF:
             t = self.dedg.getNode("\\" + probe).getDimensionAt().data()
-            if self.trange[0] is None:
-                tmin = t.min()
-            else:
-                tmin = self.trange[0]
-            if self.trange[1] is None:
-                tmax = t.max()
-            else:
-                tmax = self.trange[1]
             _indT = (t >= tmin) & (t <= tmax)
             sig = (
                 self.dedg.getNode("\\" + probe).data()[_indT]
@@ -433,7 +423,7 @@ class Uprobe:
         try:
             self.vFArr
         except:
-            self.getFloating()
+            self.getFloating(**kwargs)
         trange = kwargs.get(
             "trange", [self.vFArr.time.min().item(), self.vFArr.time.max().item()]
         )
@@ -476,7 +466,7 @@ class Uprobe:
         try:
             self.vFProfile
         except:
-            _dummy = self.FloatingProfile()
+            _dummy = self.FloatingProfile(**kwargs)
         if axes is None:
             fig, axes = mpl.pylab.subplots(figsize=(7, 6), nrows=1, ncols=1)
             fig.subplots_adjust(bottom=0.17, left=0.17)
@@ -600,7 +590,7 @@ class Uprobe:
         }
         return out
 
-    def _getExB(self, floating=False):
+    def _getExB(self, floating=False, **kwargs):
         """
         Get the ExB velocity using plasma potential on probe on
         same triple probe arrays
@@ -644,11 +634,20 @@ class Uprobe:
             try:
                 self.vFArr
             except:
-                self._getFloating()
-            # now define the arrays for each of the tower
-            # we use a try/catch so that we do not need to
-            # double check on the existence
-            Couples = np.unique(np.asarray([k[5:7] for k in self.vF]))
+                self._getFloating(trange=kwargs.get("trange", self.trange))
+            # now we aggregate them along the average r direction
 
+    def getExBprofile(self, **kwargs):
+        """
+        Compute the average ExB profile based on spline interpolation of Floating
+        potential profile and interpolation of Te profile
+        Args:
+            **kwargs: All the keyword which can be passed to getFloating e getTriple in
+            particular the trange
+        Returns:
+            A tuple with the (r,ExB and corresponding error)
 
-#            for c in Couples:
+        Returns:
+
+        """
+        pass
