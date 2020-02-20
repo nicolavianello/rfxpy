@@ -415,21 +415,23 @@ class Uprobe:
         self.vFArr.attrs["Z"] = np.asarray([self.EGrid[k]["Z"] for k in self.vF])
         self.vFArr.attrs["Phi"] = np.asarray([self.EGrid[k]["Phi"] for k in self.vF])
 
-    def FloatingProfile(self, aggregate=True, **kwargs):
+    def FloatingProfile(self, **kwargs):
         """
         Provide a list f DataArray each containing the profiles on different rows
         """
         # check the the floating potential has been properly stored
         try:
             self.vFArr
+            trange = kwargs.get(
+                "trange", [self.vFArr.time.min().item(), self.vFArr.time.max().item()]
+            )
+            _dummy = self.vFArr.where(
+                ((self.vFArr.time >= trange[0]) & (self.vFArr.time <= trange[1])),
+                drop=True,
+            )
         except:
-            self.getFloating(aggregate=kwargs.get("aggregate", False), **kwargs)
-        trange = kwargs.get(
-            "trange", [self.vFArr.time.min().item(), self.vFArr.time.max().item()]
-        )
-        _dummy = self.vFArr.where(
-            ((self.vFArr.time >= trange[0]) & (self.vFArr.time <= trange[1])), drop=True
-        )
+            self.getFloating(**kwargs)
+            trange = self.vFArr.time.min().item(), self.vFArr.time.max().item()
         # find the corresponding point in time where the equilibrium is within
         # the limit
         _idxEq = (self.tEq >= trange[0]) & (self.tEq <= trange[1])
@@ -458,7 +460,7 @@ class Uprobe:
         self.vFProfile = _dummyP
         return self.vFProfile.copy()
 
-    def VfProfilePlot(self, axes=None, aggregate=False, **kwargs):
+    def VfProfilePlot(self, axes=None, **kwargs):
         """
         Plot the profile once it has been calculated taking care of the possible NaNs
 
@@ -471,6 +473,7 @@ class Uprobe:
             fig, axes = mpl.pylab.subplots(figsize=(7, 6), nrows=1, ncols=1)
             fig.subplots_adjust(bottom=0.17, left=0.17)
 
+        aggregate = kwargs.get("aggregate", True)
         if aggregate is False:
             for k in range(len(self.vFProfile)):
                 x = self.vFProfile[k].r
