@@ -478,6 +478,7 @@ class Uprobe:
             fig.subplots_adjust(bottom=0.17, left=0.17)
 
         aggregate = kwargs.get("aggregate", True)
+        kwargs = kwargs.pop("trange", None)
         if aggregate is False:
             for k in range(len(self.vFProfile)):
                 x = self.vFProfile[k].r
