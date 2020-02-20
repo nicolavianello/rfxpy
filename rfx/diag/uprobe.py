@@ -415,7 +415,7 @@ class Uprobe:
         self.vFArr.attrs["Z"] = np.asarray([self.EGrid[k]["Z"] for k in self.vF])
         self.vFArr.attrs["Phi"] = np.asarray([self.EGrid[k]["Phi"] for k in self.vF])
 
-    def FloatingProfile(self, **kwargs):
+    def FloatingProfile(self, aggregate=True, **kwargs):
         """
         Provide a list f DataArray each containing the profiles on different rows
         """
@@ -423,7 +423,7 @@ class Uprobe:
         try:
             self.vFArr
         except:
-            self.getFloating(**kwargs)
+            self.getFloating(aggregate=kwargs.get("aggregate", False), **kwargs)
         trange = kwargs.get(
             "trange", [self.vFArr.time.min().item(), self.vFArr.time.max().item()]
         )
