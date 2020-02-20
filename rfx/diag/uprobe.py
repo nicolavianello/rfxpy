@@ -478,7 +478,6 @@ class Uprobe:
             fig.subplots_adjust(bottom=0.17, left=0.17)
 
         aggregate = kwargs.get("aggregate", True)
-        kwargs = kwargs.pop("trange", None)
         if aggregate is False:
             for k in range(len(self.vFProfile)):
                 x = self.vFProfile[k].r
@@ -515,9 +514,10 @@ class Uprobe:
                 xAll[~np.isnan(yAll)],
                 yAll[~np.isnan(yAll)],
                 yerr=eAll[~np.isnan(yAll)],
-                fmt="o",
-                ms=12,
-                **kwargs
+                fmt=kwargs.get("fmt", "o"),
+                ms=kwargs.get("ms", 12),
+                color=kwargs.get("color", "k"),
+                ecolor=kwargs.get("ecolor", "k"),
             )
             axes.set_xlabel(r"R [m]")
             axes.set_ylabel(r"V$_f$ [V]")
