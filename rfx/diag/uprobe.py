@@ -432,6 +432,10 @@ class Uprobe:
         except:
             self.getFloating(**kwargs)
             trange = self.vFArr.time.min().item(), self.vFArr.time.max().item()
+            _dummy = self.vFArr.where(
+                ((self.vFArr.time >= trange[0]) & (self.vFArr.time <= trange[1])),
+                drop=True,
+            )
         # find the corresponding point in time where the equilibrium is within
         # the limit
         _idxEq = (self.tEq >= trange[0]) & (self.tEq <= trange[1])
